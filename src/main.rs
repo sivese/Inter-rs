@@ -1,4 +1,4 @@
-use std::ptr::NonNull;
+use std::ptr::{NonNull, write};
 
 pub type BlockPtr = NonNull<u8>;
 pub type BlockSize = usize;
@@ -55,6 +55,15 @@ mod internal {
     }
 }
 
+mod constants {
+    pub const BLOCK_SIZE_BITS : usize = 15;
+    pub const BLOCK_SIZE : usize = 1 << BLOCK_SIZE_BITS;
+
+    pub const LINE_SIZE_BITS : usize = 7;
+    pub const LINE_SIZE : usize = 1 << LINE_SIZE_BITS;
+//    pub const LINE_COUNT : usize = BLOCK_SIZE / LINE_SIZE;
+}
+
 struct BumpBlock {
     cursor  : usize,
     limit   : usize,
@@ -62,10 +71,23 @@ struct BumpBlock {
     meta    : Box<BlockMeta>
 }
 
-mod contants {
-    pub const LINE_SIZE_BITS : usize = 7;
-    pub const LINE_SIZE : usize = 1 << LINE_SIZE_BITS;
-//    pub const LINE_COUNT : usize = BLOCK_SIZE / LINE_SIZE;
+impl BumpBlock {
+    pub fn inner_alloc(&mut self, alloc_size : usize) -> Option<*const u8> {
+        let next_bump = self.cursor + alloc_size;
+
+        if next_bump > constants::BLOCK_SIZE {
+            None
+        }
+        else {
+            let offset = self.cursor;
+            self.cursor = next_bump;
+            unsafe { Some(self.block.as_ptr().add(offset) as *const u8) }
+        }
+    }
+}
+
+unsafe fn write<T> (dest : *const u8, object : T) {
+    write(dest as *mut T, object);
 }
 
 pub struct BlockMeta {
